@@ -9,14 +9,16 @@ template.mcp MCP Server — 通用的 Stdio MCP 服务器骨架。
   3. client → tools/list → server → tools[]
   4. client → tools/call → server → content[]
 
-===== ⚠️ 定制指南 =====
+# ==================== 定制指南 =====
 使用此模板创建新 MCP 仓库时：
 
 1. 修改 SERVER_INFO["name"] 和 SERVER_INFO["version"]
+   ⚠️ 如果通过 LiteLLM 注册，name 中不能含连字符（-）
+     例：hermes-chores → mcpChores
 2. 修改 CONTENT_DIR 指向你仓库的内容目录
-3. 修改 load_entries() 函数扫描你的内容结构
-4. 修改 handle_list_tools() 暴露哪些工具
-5. 修改 handle_call_tool() 返回什么内容
+3. 按需修改 load_entries() 的扫描逻辑
+4. 按需修改 handle_list_tools() 暴露哪些工具
+5. 按需修改 handle_call_tool() 返回什么内容
 6. 按需扩展 CAPABILITIES（添加 resources / prompts 支持）
 ======================
 """
@@ -46,48 +48,54 @@ CONTENT_DIR = HERE / "skills"
 
 def load_entries(base: Path) -> list[dict]:
     """
-    扫描内容目录，返回条目元信息列表。
+    递归扫描内容目录，返回条目元信息列表。
+
+    支持分类目录嵌套（如 back-end/deepseek-cost/），
+    递归进入没有 SKILL.md 的子目录继续查找。
 
     ⚠️ 如需改为其他文件结构（SQLite、API、本地 JSON 等），修改此函数。
-    默认实现：扫描 base/ 下的子目录，读取每个子目录的 index.md
-    作为条目描述。
+    默认实现：递归扫描 base/ 下所有子目录，读取每个含 SKILL.md /
+    index.md / README.md 的目录作为条目。
     """
     if not base.is_dir():
         return []
 
     entries = []
-    for sub in sorted(base.iterdir()):
-        if not sub.is_dir():
-            continue
-        # 查找 index.md 或 SKILL.md 或 README.md 作为描述源
-        desc_file = None
-        for name in ("SKILL.md", "index.md", "README.md"):
-            if (sub / name).is_file():
-                desc_file = sub / name
-                break
-        if not desc_file:
-            continue
 
-        text = desc_file.read_text(encoding="utf-8")
-        desc = ""
-        tags = []
-        for line in text.splitlines():
-            if line.startswith("description:"):
-                desc = line.split(":", 1)[1].strip().strip('"').strip("'")
-            if line.startswith("tags:"):
-                raw = line.split(":", 1)[1].strip()
-                if raw.startswith("["):
-                    raw = raw.strip("[]")
-                tags = [t.strip().strip('"').strip("'") for t in raw.split(",") if t.strip()]
-            if line.startswith("---") and desc:
-                break
+    def _scan(dirpath: Path):
+        for sub in sorted(dirpath.iterdir()):
+            if not sub.is_dir():
+                continue
+            desc_file = None
+            for name in ("SKILL.md", "index.md", "README.md"):
+                if (sub / name).is_file():
+                    desc_file = sub / name
+                    break
+            if desc_file:
+                text = desc_file.read_text(encoding="utf-8")
+                desc = ""
+                tags = []
+                for line in text.splitlines():
+                    if line.startswith("description:"):
+                        desc = line.split(":", 1)[1].strip().strip('"').strip("'")
+                    if line.startswith("tags:"):
+                        raw = line.split(":", 1)[1].strip()
+                        if raw.startswith("["):
+                            raw = raw.strip("[]")
+                        tags = [t.strip().strip('"').strip("'") for t in raw.split(",") if t.strip()]
+                    if line.startswith("---") and desc:
+                        break
+                entries.append({
+                    "name": sub.name,
+                    "description": desc or f"条目: {sub.name}",
+                    "path": str(desc_file),
+                    "tags": tags,
+                })
+            else:
+                # 无 SKILL.md 的分类目录，递归深入
+                _scan(sub)
 
-        entries.append({
-            "name": sub.name,
-            "description": desc or f"条目: {sub.name}",
-            "path": str(desc_file),
-            "tags": tags,
-        })
+    _scan(base)
     return entries
 
 

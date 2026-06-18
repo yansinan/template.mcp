@@ -61,6 +61,7 @@ template.mcp/
 ### 添加内容
 
 - 每个内容条目一个子目录，内含 SKILL.md / index.md / README.md
+- 支持分类目录嵌套（如 `back-end/deepseek-cost/`），`load_entries()` 会递归扫描
 - 如需更改文件扫描逻辑，修改 `load_entries()`
 
 ### 搜索优先级

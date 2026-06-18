@@ -36,13 +36,13 @@ git submodule add https://github.com/your/new-repo.git
 
 ```python
 SERVER_INFO = {
-    "name": "your-service-name",   # ← 改
+    "name": "your-service-name",   # ← 改（注意：LiteLLM 的 MCP key 不能含 -）
     "version": "1.0.0",
 }
 CONTENT_DIR = HERE / "skills"       # ← 改为你实际的内容目录
 ```
 
-然后按需求修改 `load_entries()`、`handle_list_tools()`、`handle_call_tool()`。
+然后按需求修改 `load_entries()`（默认递归扫描，支持分类目录嵌套）、`handle_list_tools()`、`handle_call_tool()`。
 
 ### 3. 填入内容
 
